@@ -48,7 +48,6 @@ Task-Reminder/
 
 - [Node.js](https://nodejs.org/) (v18+ recommended)
 - [MySQL](https://dev.mysql.com/downloads/) running locally
-- [WSL](https://learn.microsoft.com/en-us/windows/wsl/) (recommended for development on Windows)
 - A Gmail account with an [App Password](https://myaccount.google.com/apppasswords) for SMTP (optional for local dev)
 
 ## Database Setup
@@ -103,18 +102,19 @@ INSERT INTO tasks (user_id, title, description, status, due_date) VALUES
 
 ## Environment Configuration
 
-Copy the example env file and fill in your values:
+From the project root, go to the `backend` directory and create a `.env` file from the example template:
 
-```bash
-cd backend
-cp .env.example .env
-```
+- **macOS / Linux:** `cp .env.example .env`
+- **Windows (Command Prompt):** `copy .env.example .env`
+- **Windows (PowerShell):** `Copy-Item .env.example .env`
+
+Then fill in your values in `backend/.env`.
 
 | Variable       | Description |
 |----------------|-------------|
 | `PORT`         | Backend port (default: `3000`) |
 | `JWT_SECRET`   | Secret key for signing JWT tokens |
-| `DB_HOST`      | MySQL host (`127.0.0.1` in WSL) |
+| `DB_HOST`      | MySQL host (`127.0.0.1` or `localhost`) |
 | `DB_PORT`      | MySQL port (default: `3306`) |
 | `DB_USER`      | MySQL username |
 | `DB_PASSWORD`  | MySQL password |
@@ -127,16 +127,14 @@ cp .env.example .env
 
 ## Installation & Running
 
-Commands below assume a WSL terminal. Adjust paths if your project lives elsewhere.
+Run these commands from the project root unless noted otherwise.
 
 ### 1. Install dependencies
 
 ```bash
-# Backend
-cd /mnt/d/College\ Stuff/Web\ Tech\ Internship/Assignments/Task-Reminder/backend
+cd backend
 npm install
 
-# Frontend
 cd ../frontend
 npm install
 ```
