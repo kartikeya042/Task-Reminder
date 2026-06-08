@@ -7,7 +7,7 @@ export default function Signup() {
   const [form, setForm] = useState({
     name: '',
     mobile: '',
-    email: '',
+    emailPrefix: '',
     password: '',
     captchaAnswer: '',
   });
@@ -36,10 +36,22 @@ export default function Signup() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const handleEmailPrefixChange = (e) => {
+    const value = e.target.value.replace(/@/g, '');
+    setForm((prev) => ({ ...prev, emailPrefix: value }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    if (!form.emailPrefix.trim()) {
+      setError('Email prefix is required');
+      return;
+    }
+
+    const fullEmail = `${form.emailPrefix.trim()}@gmail.com`;
     setLoading(true);
 
     try {
@@ -47,7 +59,10 @@ export default function Signup() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...form,
+          name: form.name,
+          mobile: form.mobile,
+          email: fullEmail,
+          password: form.password,
           captchaToken,
           captchaAnswer: form.captchaAnswer,
         }),
@@ -63,7 +78,7 @@ export default function Signup() {
 
       setSuccess(data.message);
       setTimeout(() => {
-        navigate(`/verify?email=${encodeURIComponent(form.email)}`);
+        navigate(`/verify?email=${encodeURIComponent(fullEmail)}`);
       }, 2000);
     } catch {
       setError('Network error. Is the backend running?');
@@ -110,16 +125,23 @@ export default function Signup() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              required
-              placeholder="you@example.com"
-            />
+            <label htmlFor="emailPrefix">Email</label>
+            <div className="email-input-group">
+              <input
+                id="emailPrefix"
+                name="emailPrefix"
+                type="text"
+                value={form.emailPrefix}
+                onChange={handleEmailPrefixChange}
+                onKeyDown={(e) => {
+                  if (e.key === '@') e.preventDefault();
+                }}
+                required
+                placeholder="username"
+                autoComplete="username"
+              />
+              <span className="email-suffix">@gmail.com</span>
+            </div>
           </div>
 
           <div className="form-group">
@@ -164,7 +186,11 @@ export default function Signup() {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading || !form.emailPrefix.trim()}
+          >
             {loading ? 'Signing up…' : 'Sign Up'}
           </button>
         </form>

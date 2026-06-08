@@ -5,7 +5,7 @@ import { API_BASE } from './api';
 export default function Login() {
   const navigate = useNavigate();
   const [form, setForm] = useState({
-    email: '',
+    emailPrefix: '',
     password: '',
     captchaAnswer: '',
   });
@@ -33,9 +33,21 @@ export default function Login() {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
+  const handleEmailPrefixChange = (e) => {
+    const value = e.target.value.replace(/@/g, '');
+    setForm((prev) => ({ ...prev, emailPrefix: value }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!form.emailPrefix.trim()) {
+      setError('Email prefix is required');
+      return;
+    }
+
+    const fullEmail = `${form.emailPrefix.trim()}@gmail.com`;
     setLoading(true);
 
     try {
@@ -43,7 +55,7 @@ export default function Login() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: form.email,
+          email: fullEmail,
           password: form.password,
           captchaToken,
           captchaAnswer: form.captchaAnswer,
@@ -80,16 +92,23 @@ export default function Login() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              required
-              placeholder="you@example.com"
-            />
+            <label htmlFor="emailPrefix">Email</label>
+            <div className="email-input-group">
+              <input
+                id="emailPrefix"
+                name="emailPrefix"
+                type="text"
+                value={form.emailPrefix}
+                onChange={handleEmailPrefixChange}
+                onKeyDown={(e) => {
+                  if (e.key === '@') e.preventDefault();
+                }}
+                required
+                placeholder="username"
+                autoComplete="username"
+              />
+              <span className="email-suffix">@gmail.com</span>
+            </div>
           </div>
 
           <div className="form-group">
@@ -130,7 +149,11 @@ export default function Login() {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={loading}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading || !form.emailPrefix.trim()}
+          >
             {loading ? 'Logging in…' : 'Log In'}
           </button>
         </form>
