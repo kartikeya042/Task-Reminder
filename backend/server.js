@@ -731,6 +731,27 @@ app.delete('/api/tasks/:id', authMiddleware, async (req, res) => {
   }
 });
 
+app.get('/api/visitor-count', async (_req, res) => {
+  try {
+    await pool.query(
+      'UPDATE site_analytics SET visitor_count = visitor_count + 1 WHERE id = 1'
+    );
+
+    const [rows] = await pool.query(
+      'SELECT visitor_count FROM site_analytics WHERE id = 1'
+    );
+
+    if (rows.length === 0) {
+      return res.status(503).json({ message: 'Visitor analytics not initialized' });
+    }
+
+    res.json({ visitor_count: rows[0].visitor_count });
+  } catch (err) {
+    console.error('Visitor count error:', err);
+    res.status(500).json({ message: 'Server error fetching visitor count' });
+  }
+});
+
 app.get('/api/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');

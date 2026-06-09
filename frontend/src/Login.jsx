@@ -14,6 +14,7 @@ export default function Login() {
   const [mathQuestion, setMathQuestion] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [visitorCount, setVisitorCount] = useState('...');
 
   const fetchMathCaptcha = async () => {
     try {
@@ -28,6 +29,22 @@ export default function Login() {
 
   useEffect(() => {
     fetchMathCaptcha();
+  }, []);
+
+  useEffect(() => {
+    const fetchVisitorCount = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/visitor-count`);
+        const data = await res.json();
+        if (res.ok) {
+          setVisitorCount(data.visitor_count);
+        }
+      } catch {
+        setVisitorCount('—');
+      }
+    };
+
+    fetchVisitorCount();
   }, []);
 
   const handleChange = (e) => {
@@ -150,6 +167,11 @@ export default function Login() {
             </div>
           </div>
 
+          <p className="terms-notice">
+            By continuing, you agree to our{' '}
+            <a href="#">Terms and Conditions</a>
+          </p>
+
           <p className="forgot-password-link">
             <Link to="/forgot-password">Forgot Password?</Link>
           </p>
@@ -166,6 +188,8 @@ export default function Login() {
         <p className="auth-footer">
           Don&apos;t have an account? <Link to="/signup">Sign up</Link>
         </p>
+
+        <p className="visitor-counter">Total Visitors: {visitorCount}</p>
       </div>
     </div>
   );

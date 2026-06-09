@@ -36,3 +36,10 @@ CREATE TABLE IF NOT EXISTS task_notification_log (
   UNIQUE KEY unique_task_slot (task_id, slot_key),
   FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS site_analytics (
+  id INT PRIMARY KEY,
+  visitor_count INT NOT NULL DEFAULT 0
+);
+
+INSERT INTO site_analytics (id, visitor_count) VALUES (1, 0);

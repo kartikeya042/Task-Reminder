@@ -17,6 +17,7 @@ export default function Signup() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [visitorCount, setVisitorCount] = useState('...');
 
   const fetchMathCaptcha = async () => {
     try {
@@ -31,6 +32,22 @@ export default function Signup() {
 
   useEffect(() => {
     fetchMathCaptcha();
+  }, []);
+
+  useEffect(() => {
+    const fetchVisitorCount = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/visitor-count`);
+        const data = await res.json();
+        if (res.ok) {
+          setVisitorCount(data.visitor_count);
+        }
+      } catch {
+        setVisitorCount('—');
+      }
+    };
+
+    fetchVisitorCount();
   }, []);
 
   const handleChange = (e) => {
@@ -185,6 +202,11 @@ export default function Signup() {
             </div>
           </div>
 
+          <p className="terms-notice">
+            By continuing, you agree to our{' '}
+            <a href="#">Terms and Conditions</a>
+          </p>
+
           <button
             type="submit"
             className="btn btn-primary"
@@ -197,6 +219,8 @@ export default function Signup() {
         <p className="auth-footer">
           Already have an account? <Link to="/login">Log in</Link>
         </p>
+
+        <p className="visitor-counter">Total Visitors: {visitorCount}</p>
       </div>
     </div>
   );

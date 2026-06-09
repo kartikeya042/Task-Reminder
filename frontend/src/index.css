@@ -307,6 +307,34 @@ a:hover {
   font-size: 0.875rem;
 }
 
+.terms-notice {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+
+.terms-notice a {
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.terms-notice a:hover {
+  color: var(--primary);
+}
+
+.visitor-counter {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
 .password-input-group {
   position: relative;
   display: flex;
