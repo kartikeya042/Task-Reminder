@@ -6,5 +6,7 @@ dist/
 *.docx
 .wwebjs_auth/
 .wwebjs_cache/
+whatsapp-service/.wwebjs_auth/
+whatsapp-service/.wwebjs_cache/
 
 !.env.example
