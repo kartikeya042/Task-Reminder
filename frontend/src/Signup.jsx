@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE } from './api';
+import PasswordInput from './PasswordInput';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -138,7 +139,7 @@ export default function Signup() {
                   if (e.key === '@') e.preventDefault();
                 }}
                 required
-                placeholder="username"
+                placeholder="Enter your email"
                 autoComplete="username"
               />
               <span className="email-suffix">@gmail.com</span>
@@ -147,15 +148,15 @@ export default function Signup() {
 
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               value={form.password}
               onChange={handleChange}
               required
               minLength={6}
               placeholder="At least 6 characters"
+              autoComplete="new-password"
             />
           </div>
 

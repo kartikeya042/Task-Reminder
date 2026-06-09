@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from './api';
 import AddTaskModal from './AddTaskModal';
+import EditTaskModal from './EditTaskModal';
 
 function formatDueDate(dueDate) {
   const raw = String(dueDate);
@@ -11,10 +12,32 @@ function formatDueDate(dueDate) {
   return `${day}-${month}-${year}`;
 }
 
-function TaskCard({ task }) {
+function TaskCard({ task, onEdit, onDelete }) {
   return (
     <div className="task-card">
-      <h3>{task.title}</h3>
+      <div className="task-card-header">
+        <h3>{task.title}</h3>
+        <div className="task-card-actions">
+          <button
+            type="button"
+            className="btn-icon"
+            onClick={() => onEdit(task)}
+            title="Edit task"
+            aria-label="Edit task"
+          >
+            ✏️
+          </button>
+          <button
+            type="button"
+            className="btn-icon btn-icon-danger"
+            onClick={() => onDelete(task.id)}
+            title="Delete task"
+            aria-label="Delete task"
+          >
+            🗑️
+          </button>
+        </div>
+      </div>
       {task.description && <p>{task.description}</p>}
       {task.due_date && (
         <span className="due-date">
@@ -31,7 +54,7 @@ function TaskCard({ task }) {
   );
 }
 
-function TaskColumn({ title, tasks, columnClass }) {
+function TaskColumn({ title, tasks, columnClass, onEdit, onDelete }) {
   return (
     <div className={`task-column ${columnClass}`}>
       <div className="task-column-header">
@@ -42,11 +65,21 @@ function TaskColumn({ title, tasks, columnClass }) {
         {tasks.length === 0 ? (
           <p className="task-empty">No tasks here</p>
         ) : (
-          tasks.map((task) => <TaskCard key={task.id} task={task} />)
+          tasks.map((task) => (
+            <TaskCard key={task.id} task={task} onEdit={onEdit} onDelete={onDelete} />
+          ))
         )}
       </div>
     </div>
   );
+}
+
+function removeTaskFromState(tasks, taskId) {
+  return {
+    new: tasks.new.filter((t) => t.id !== taskId),
+    upcoming: tasks.upcoming.filter((t) => t.id !== taskId),
+    completed: tasks.completed.filter((t) => t.id !== taskId),
+  };
 }
 
 export default function Dashboard() {
@@ -54,7 +87,8 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState({ new: [], upcoming: [], completed: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const fetchTasks = useCallback(async () => {
@@ -79,6 +113,17 @@ export default function Dashboard() {
     fetchTasks();
   }, [fetchTasks]);
 
+  const handleDelete = async (taskId) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+
+    try {
+      await apiFetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
+      setTasks((prev) => removeTaskFromState(prev, taskId));
+    } catch (err) {
+      setError(err.message || 'Failed to delete task');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -91,7 +136,7 @@ export default function Dashboard() {
         <h1>Task Reminder</h1>
         <div className="user-info">
           {user.name && <span className="user-name">Hello, {user.name}</span>}
-          <button type="button" className="btn btn-primary btn-inline" onClick={() => setShowModal(true)}>
+          <button type="button" className="btn btn-primary btn-inline" onClick={() => setShowAddModal(true)}>
             Add New Task
           </button>
           <button type="button" className="btn btn-danger" onClick={handleLogout}>
@@ -109,25 +154,39 @@ export default function Dashboard() {
               title="New Tasks"
               tasks={tasks.new}
               columnClass="column-new"
+              onEdit={setEditingTask}
+              onDelete={handleDelete}
             />
             <TaskColumn
               title="Upcoming Tasks"
               tasks={tasks.upcoming}
               columnClass="column-upcoming"
+              onEdit={setEditingTask}
+              onDelete={handleDelete}
             />
             <TaskColumn
               title="Completed Tasks"
               tasks={tasks.completed}
               columnClass="column-completed"
+              onEdit={setEditingTask}
+              onDelete={handleDelete}
             />
           </div>
         )}
       </main>
 
-      {showModal && (
+      {showAddModal && (
         <AddTaskModal
-          onClose={() => setShowModal(false)}
+          onClose={() => setShowAddModal(false)}
           onTaskCreated={fetchTasks}
+        />
+      )}
+
+      {editingTask && (
+        <EditTaskModal
+          task={editingTask}
+          onClose={() => setEditingTask(null)}
+          onTaskUpdated={fetchTasks}
         />
       )}
     </div>

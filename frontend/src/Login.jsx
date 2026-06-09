@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE } from './api';
+import PasswordInput from './PasswordInput';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -104,7 +105,7 @@ export default function Login() {
                   if (e.key === '@') e.preventDefault();
                 }}
                 required
-                placeholder="username"
+                placeholder="Enter your email"
                 autoComplete="username"
               />
               <span className="email-suffix">@gmail.com</span>
@@ -113,14 +114,14 @@ export default function Login() {
 
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
+            <PasswordInput
               id="password"
               name="password"
-              type="password"
               value={form.password}
               onChange={handleChange}
               required
               placeholder="Your password"
+              autoComplete="current-password"
             />
           </div>
 
@@ -148,6 +149,10 @@ export default function Login() {
               />
             </div>
           </div>
+
+          <p className="forgot-password-link">
+            <Link to="/forgot-password">Forgot Password?</Link>
+          </p>
 
           <button
             type="submit"

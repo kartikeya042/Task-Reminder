@@ -294,6 +294,55 @@ a:hover {
   color: var(--text-muted);
 }
 
+.forgot-password-link {
+  text-align: right;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.password-input-group {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+
+.password-input-group input {
+  padding-right: 2.85rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem;
+  color: var(--text-muted);
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.password-toggle:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.password-toggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.password-toggle-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: block;
+}
+
 /* Dashboard */
 .dashboard {
   min-height: 100vh;
@@ -409,9 +458,44 @@ a:hover {
   padding: 1rem;
 }
 
+.task-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
 .task-card h3 {
   font-size: 1rem;
-  margin-bottom: 0.35rem;
+  margin: 0;
+  flex: 1;
+}
+
+.task-card-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  padding: 0.15rem 0.3rem;
+  border-radius: 4px;
+  opacity: 0.8;
+  line-height: 1;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+  background: var(--surface-hover);
+}
+
+.btn-icon-danger:hover {
+  background: rgba(239, 68, 68, 0.15);
 }
 
 .task-card p {

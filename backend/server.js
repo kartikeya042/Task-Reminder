@@ -254,6 +254,96 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, email, is_active FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'No account found with this email' });
+    }
+
+    const user = rows[0];
+
+    if (!user.is_active) {
+      return res.status(403).json({ message: 'Account not verified. Please verify your email first.' });
+    }
+
+    const otp = generateOtp();
+
+    await pool.query('UPDATE users SET otp = ? WHERE id = ?', [otp, user.id]);
+
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+        to: email,
+        subject: 'Reset your Task Reminder password',
+        html: `
+          <h2>Password Reset</h2>
+          <p>Your password reset OTP is: <strong>${otp}</strong></p>
+          <p>This OTP is valid until you reset your password.</p>
+        `,
+      });
+    } else {
+      console.log(`[DEV] Password reset OTP for ${email}: ${otp}`);
+    }
+
+    res.json({ message: 'Password reset OTP sent to your email.' });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ message: 'Server error during password reset request' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: 'Email, OTP, and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, otp FROM users WHERE email = ?',
+      [email]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const user = rows[0];
+
+    if (!user.otp || String(user.otp) !== String(otp).trim()) {
+      return res.status(400).json({ message: 'Invalid OTP' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    await pool.query(
+      'UPDATE users SET password_hash = ?, otp = NULL WHERE id = ?',
+      [passwordHash, user.id]
+    );
+
+    res.json({ message: 'Password reset successful. You can now log in.' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ message: 'Server error during password reset' });
+  }
+});
+
 // --- Notification helpers ---
 
 function parseMysqlDate(date) {
@@ -531,6 +621,91 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Create task error:', err);
     res.status(500).json({ message: 'Server error creating task' });
+  }
+});
+
+app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
+  try {
+    const taskId = req.params.id;
+    const { title, description, due_date, has_reminder, reminder_time, reminder_type } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ message: 'Task name is required' });
+    }
+
+    const normalizedDueDate = normalizeDueDate(due_date);
+    if (!normalizedDueDate) {
+      return res.status(400).json({ message: 'A valid reminder date (YYYY-MM-DD) is required' });
+    }
+
+    const wantsReminder = Boolean(has_reminder);
+
+    if (wantsReminder) {
+      if (!reminder_time) {
+        return res.status(400).json({ message: 'Reminder time is required when time reminder is enabled' });
+      }
+      const validTypes = ['exact_time', 'every_hour', '30_min_prior', '1_hour_prior'];
+      if (!reminder_type || !validTypes.includes(reminder_type)) {
+        return res.status(400).json({ message: 'A valid reminder type is required' });
+      }
+    }
+
+    const [existing] = await pool.query(
+      'SELECT id FROM tasks WHERE id = ? AND user_id = ?',
+      [taskId, req.user.id]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    await pool.query(
+      `UPDATE tasks
+       SET title = ?, description = ?, due_date = ?,
+           has_reminder = ?, reminder_time = ?, reminder_type = ?
+       WHERE id = ? AND user_id = ?`,
+      [
+        title.trim(),
+        description?.trim() || null,
+        normalizedDueDate,
+        wantsReminder,
+        wantsReminder ? reminder_time : null,
+        wantsReminder ? reminder_type : null,
+        taskId,
+        req.user.id,
+      ]
+    );
+
+    const [rows] = await pool.query(
+      `SELECT id, title, description, status,
+              DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date,
+              has_reminder, reminder_time, reminder_type, created_at
+       FROM tasks WHERE id = ?`,
+      [taskId]
+    );
+
+    res.json(formatTaskRow(rows[0]));
+  } catch (err) {
+    console.error('Update task error:', err);
+    res.status(500).json({ message: 'Server error updating task' });
+  }
+});
+
+app.delete('/api/tasks/:id', authMiddleware, async (req, res) => {
+  try {
+    const [result] = await pool.query(
+      'DELETE FROM tasks WHERE id = ? AND user_id = ?',
+      [req.params.id, req.user.id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    res.json({ message: 'Task deleted successfully' });
+  } catch (err) {
+    console.error('Delete task error:', err);
+    res.status(500).json({ message: 'Server error deleting task' });
   }
 });
 
