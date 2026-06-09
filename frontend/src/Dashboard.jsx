@@ -12,21 +12,119 @@ function formatDueDate(dueDate) {
   return `${day}-${month}-${year}`;
 }
 
-function TaskCard({ task, onEdit, onDelete }) {
+function parseDueDateForSort(dueDate) {
+  if (dueDate === null || dueDate === undefined || dueDate === '') return null;
+  const raw = String(dueDate);
+  const dateStr = raw.includes('T') ? raw.split('T')[0] : raw.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : null;
+}
+
+function parseReminderTimeForSort(reminderTime) {
+  if (!reminderTime) return null;
+  return String(reminderTime).slice(0, 8);
+}
+
+function parseCreatedAt(createdAt) {
+  if (!createdAt) return 0;
+  return new Date(createdAt).getTime();
+}
+
+function sortTasks(tasks) {
+  return [...tasks].sort((a, b) => {
+    const aDue = parseDueDateForSort(a.due_date);
+    const bDue = parseDueDateForSort(b.due_date);
+
+    if (aDue && !bDue) return -1;
+    if (!aDue && bDue) return 1;
+    if (!aDue && !bDue) {
+      return parseCreatedAt(a.created_at) - parseCreatedAt(b.created_at);
+    }
+
+    const byDue = aDue.localeCompare(bDue);
+    if (byDue !== 0) return byDue;
+
+    const aTime = parseReminderTimeForSort(a.reminder_time);
+    const bTime = parseReminderTimeForSort(b.reminder_time);
+
+    if (aTime && bTime) {
+      const byTime = aTime.localeCompare(bTime);
+      if (byTime !== 0) return byTime;
+    } else if (aTime && !bTime) {
+      return -1;
+    } else if (!aTime && bTime) {
+      return 1;
+    }
+
+    return parseCreatedAt(a.created_at) - parseCreatedAt(b.created_at);
+  });
+}
+
+function sortTaskGroups(data) {
+  return {
+    new: sortTasks(data.new || []),
+    upcoming: sortTasks(data.upcoming || []),
+    completed: sortTasks(data.completed || []),
+  };
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      className="task-action-icon"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      className="task-action-icon"
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+    </svg>
+  );
+}
+
+function TaskCard({ task, showEdit, onEdit, onDelete }) {
   return (
     <div className="task-card">
       <div className="task-card-header">
         <h3>{task.title}</h3>
         <div className="task-card-actions">
-          <button
-            type="button"
-            className="btn-icon"
-            onClick={() => onEdit(task)}
-            title="Edit task"
-            aria-label="Edit task"
-          >
-            ✏️
-          </button>
+          {showEdit && (
+            <button
+              type="button"
+              className="btn-icon btn-icon-edit"
+              onClick={() => onEdit(task)}
+              title="Edit task"
+              aria-label="Edit task"
+            >
+              <PencilIcon />
+            </button>
+          )}
           <button
             type="button"
             className="btn-icon btn-icon-danger"
@@ -34,7 +132,7 @@ function TaskCard({ task, onEdit, onDelete }) {
             title="Delete task"
             aria-label="Delete task"
           >
-            🗑️
+            <TrashIcon />
           </button>
         </div>
       </div>
@@ -54,7 +152,7 @@ function TaskCard({ task, onEdit, onDelete }) {
   );
 }
 
-function TaskColumn({ title, tasks, columnClass, onEdit, onDelete }) {
+function TaskColumn({ title, tasks, columnClass, showEdit, onEdit, onDelete }) {
   return (
     <div className={`task-column ${columnClass}`}>
       <div className="task-column-header">
@@ -66,7 +164,13 @@ function TaskColumn({ title, tasks, columnClass, onEdit, onDelete }) {
           <p className="task-empty">No tasks here</p>
         ) : (
           tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onEdit={onEdit} onDelete={onDelete} />
+            <TaskCard
+              key={task.id}
+              task={task}
+              showEdit={showEdit}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
           ))
         )}
       </div>
@@ -94,7 +198,7 @@ export default function Dashboard() {
   const fetchTasks = useCallback(async () => {
     try {
       const data = await apiFetch('/api/tasks');
-      setTasks(data);
+      setTasks(sortTaskGroups(data));
       setError('');
     } catch (err) {
       if (err.message === 'Unauthorized' || err.message === 'Invalid or expired token') {
@@ -154,6 +258,7 @@ export default function Dashboard() {
               title="New Tasks"
               tasks={tasks.new}
               columnClass="column-new"
+              showEdit
               onEdit={setEditingTask}
               onDelete={handleDelete}
             />
@@ -161,6 +266,7 @@ export default function Dashboard() {
               title="Upcoming Tasks"
               tasks={tasks.upcoming}
               columnClass="column-upcoming"
+              showEdit
               onEdit={setEditingTask}
               onDelete={handleDelete}
             />
@@ -168,6 +274,7 @@ export default function Dashboard() {
               title="Completed Tasks"
               tasks={tasks.completed}
               columnClass="column-completed"
+              showEdit={false}
               onEdit={setEditingTask}
               onDelete={handleDelete}
             />
