@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+const fs = require('fs');
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
@@ -9,6 +10,8 @@ const nodemailer = require('nodemailer');
 const svgCaptcha = require('svg-captcha');
 const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const qrcode = require('qrcode-terminal');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,6 +42,69 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+});
+
+let whatsappReady = false;
+
+function resolveChromeExecutablePath() {
+  if (process.env.CHROME_PATH && fs.existsSync(process.env.CHROME_PATH)) {
+    return process.env.CHROME_PATH;
+  }
+
+  const candidates = [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  ];
+
+  return candidates.find((path) => fs.existsSync(path)) || null;
+}
+
+const chromeExecutablePath = resolveChromeExecutablePath();
+const puppeteerOptions = {
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+};
+
+if (chromeExecutablePath) {
+  puppeteerOptions.executablePath = chromeExecutablePath;
+  console.log(`[WHATSAPP] Using Chrome at: ${chromeExecutablePath}`);
+} else {
+  console.warn(
+    '[WHATSAPP] Chrome not found. Install Google Chrome or set CHROME_PATH in .env'
+  );
+}
+
+const client = new Client({
+  authStrategy: new LocalAuth(),
+  puppeteer: puppeteerOptions,
+});
+
+client.on('qr', (qr) => {
+  console.log('[WHATSAPP] Scan the QR code below to authenticate:');
+  qrcode.generate(qr, { small: true });
+});
+
+client.on('ready', () => {
+  whatsappReady = true;
+  console.log('[WHATSAPP] Client is ready!');
+});
+
+client.on('auth_failure', (msg) => {
+  whatsappReady = false;
+  console.error('[WHATSAPP] Authentication failure:', msg);
+});
+
+client.on('disconnected', (reason) => {
+  whatsappReady = false;
+  console.warn('[WHATSAPP] Client disconnected:', reason);
+});
+
+client.initialize().catch((err) => {
+  whatsappReady = false;
+  console.error('[WHATSAPP] Failed to initialize:', err.message);
 });
 
 function storeCaptcha(value) {
@@ -439,9 +505,30 @@ async function sendReminderEmail(email, task) {
   }
 }
 
-// Stub — replace with Twilio, whatsapp-web.js, or another WhatsApp provider integration.
+function formatWhatsAppNumber(mobile) {
+  const digits = String(mobile).replace(/\D/g, '');
+  let number = digits;
+
+  if (number.length === 10) {
+    number = `91${number}`;
+  }
+
+  return `${number}@c.us`;
+}
+
 async function sendWhatsAppNotification(mobile, message) {
-  console.log(`[WHATSAPP STUB] Sending message to ${mobile}: ${message}`);
+  if (!whatsappReady) {
+    console.log(`[WHATSAPP] Client not ready. Skipping message to ${mobile}`);
+    return;
+  }
+
+  try {
+    const formattedNumber = formatWhatsAppNumber(mobile);
+    await client.sendMessage(formattedNumber, message);
+    console.log(`[WHATSAPP] Message sent to ${formattedNumber}`);
+  } catch (err) {
+    console.error(`[WHATSAPP] Failed to send message to ${mobile}:`, err.message);
+  }
 }
 
 async function autoCompleteExpiredTasks(currentLocalDate, currentLocalTime) {

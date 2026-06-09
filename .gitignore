@@ -4,5 +4,7 @@ node_modules/
 dist/
 *.log
 *.docx
+.wwebjs_auth/
+.wwebjs_cache/
 
 !.env.example
