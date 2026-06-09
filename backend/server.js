@@ -547,18 +547,17 @@ app.get('/api/tasks', authMiddleware, async (req, res) => {
     );
 
     const grouped = {
-      new: [],
       upcoming: [],
       completed: [],
     };
 
     for (const task of tasks) {
       const formatted = formatTaskRow(task);
-      const status = (formatted.status || 'new').toLowerCase();
-      if (grouped[status]) {
-        grouped[status].push(formatted);
+      const status = (formatted.status || 'upcoming').toLowerCase();
+      if (status === 'completed') {
+        grouped.completed.push(formatted);
       } else {
-        grouped.new.push(formatted);
+        grouped.upcoming.push(formatted);
       }
     }
 
@@ -571,7 +570,7 @@ app.get('/api/tasks', authMiddleware, async (req, res) => {
 
 app.post('/api/tasks', authMiddleware, async (req, res) => {
   try {
-    const { title, description, due_date, has_reminder, reminder_time, reminder_type } = req.body;
+    const { title, description, due_date, status, has_reminder, reminder_time, reminder_type } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ message: 'Task name is required' });
@@ -581,6 +580,9 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
     if (!normalizedDueDate) {
       return res.status(400).json({ message: 'A valid reminder date (YYYY-MM-DD) is required' });
     }
+
+    const validStatuses = ['upcoming', 'completed'];
+    const taskStatus = validStatuses.includes(status) ? status : 'upcoming';
 
     const wantsReminder = Boolean(has_reminder);
 
@@ -597,11 +599,12 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO tasks
         (user_id, title, description, status, due_date, has_reminder, reminder_time, reminder_type)
-       VALUES (?, ?, ?, 'upcoming', ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.user.id,
         title.trim(),
         description?.trim() || null,
+        taskStatus,
         normalizedDueDate,
         wantsReminder,
         wantsReminder ? reminder_time : null,
@@ -627,7 +630,7 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
 app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
   try {
     const taskId = req.params.id;
-    const { title, description, due_date, has_reminder, reminder_time, reminder_type } = req.body;
+    const { title, description, due_date, status, has_reminder, reminder_time, reminder_type } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ message: 'Task name is required' });
@@ -636,6 +639,11 @@ app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
     const normalizedDueDate = normalizeDueDate(due_date);
     if (!normalizedDueDate) {
       return res.status(400).json({ message: 'A valid reminder date (YYYY-MM-DD) is required' });
+    }
+
+    const validStatuses = ['upcoming', 'completed'];
+    if (!status || !validStatuses.includes(status)) {
+      return res.status(400).json({ message: 'A valid status (upcoming or completed) is required' });
     }
 
     const wantsReminder = Boolean(has_reminder);
@@ -661,13 +669,14 @@ app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
 
     await pool.query(
       `UPDATE tasks
-       SET title = ?, description = ?, due_date = ?,
+       SET title = ?, description = ?, due_date = ?, status = ?,
            has_reminder = ?, reminder_time = ?, reminder_type = ?
        WHERE id = ? AND user_id = ?`,
       [
         title.trim(),
         description?.trim() || null,
         normalizedDueDate,
+        status,
         wantsReminder,
         wantsReminder ? reminder_time : null,
         wantsReminder ? reminder_type : null,

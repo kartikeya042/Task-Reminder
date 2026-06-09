@@ -1,12 +1,23 @@
 import { useState } from 'react';
 import { apiFetch } from './api';
 
+const NATIVE_PICKER_STYLE = { colorScheme: 'dark' };
+
 const REMINDER_TYPES = [
   { value: 'exact_time', label: 'Exact Time' },
   { value: 'every_hour', label: 'Every hour in a day' },
   { value: '30_min_prior', label: '30 min prior' },
   { value: '1_hour_prior', label: '1 hour prior' },
 ];
+
+const TASK_STATUSES = [
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'completed', label: 'Completed' },
+];
+
+function normalizeTaskStatus(status) {
+  return status === 'completed' ? 'completed' : 'upcoming';
+}
 
 function parseDueDate(dueDate) {
   const raw = String(dueDate || '');
@@ -23,6 +34,7 @@ export default function EditTaskModal({ task, onClose, onTaskUpdated }) {
     title: task.title || '',
     description: task.description || '',
     due_date: parseDueDate(task.due_date),
+    status: normalizeTaskStatus(task.status),
     has_reminder: Boolean(task.has_reminder),
     reminder_time: parseReminderTime(task.reminder_time),
     reminder_type: task.reminder_type || 'exact_time',
@@ -50,6 +62,7 @@ export default function EditTaskModal({ task, onClose, onTaskUpdated }) {
         title: form.title.trim(),
         description: form.description.trim(),
         due_date: dueDate,
+        status: form.status,
         has_reminder: form.has_reminder,
         reminder_time: form.has_reminder ? form.reminder_time : null,
         reminder_type: form.has_reminder ? form.reminder_type : null,
@@ -119,10 +132,29 @@ export default function EditTaskModal({ task, onClose, onTaskUpdated }) {
               id="edit-due_date"
               name="due_date"
               type="date"
+              className="date-time-input"
+              style={NATIVE_PICKER_STYLE}
               value={form.due_date}
               onChange={handleChange}
               required
             />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="edit-status">Status</label>
+            <select
+              id="edit-status"
+              name="status"
+              value={form.status}
+              onChange={handleChange}
+              required
+            >
+              {TASK_STATUSES.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="form-group checkbox-group">
@@ -145,6 +177,8 @@ export default function EditTaskModal({ task, onClose, onTaskUpdated }) {
                   id="edit-reminder_time"
                   name="reminder_time"
                   type="time"
+                  className="date-time-input"
+                  style={NATIVE_PICKER_STYLE}
                   value={form.reminder_time}
                   onChange={handleChange}
                   required

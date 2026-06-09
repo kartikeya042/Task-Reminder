@@ -1,12 +1,32 @@
 import { useState } from 'react';
 import { apiFetch } from './api';
 
+const NATIVE_PICKER_STYLE = { colorScheme: 'dark' };
+
 const REMINDER_TYPES = [
   { value: 'exact_time', label: 'Exact Time' },
   { value: 'every_hour', label: 'Every hour in a day' },
   { value: '30_min_prior', label: '30 min prior' },
   { value: '1_hour_prior', label: '1 hour prior' },
 ];
+
+function isScheduledInPast(dueDate, hasReminder, reminderTime) {
+  const dateStr = dueDate.slice(0, 10);
+  const now = new Date();
+
+  if (hasReminder && reminderTime) {
+    const scheduled = new Date(`${dateStr}T${reminderTime}:00`);
+    return scheduled < now;
+  }
+
+  const todayStr = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
+
+  return dateStr < todayStr;
+}
 
 export default function AddTaskModal({ onClose, onTaskCreated }) {
   const [form, setForm] = useState({
@@ -31,15 +51,22 @@ export default function AddTaskModal({ onClose, onTaskCreated }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
 
     const dueDate = form.due_date.slice(0, 10);
+
+    if (isScheduledInPast(dueDate, form.has_reminder, form.reminder_time)) {
+      setError('Cannot schedule a task in the past.');
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
         due_date: dueDate,
+        status: 'upcoming',
         has_reminder: form.has_reminder,
         reminder_time: form.has_reminder ? form.reminder_time : null,
         reminder_type: form.has_reminder ? form.reminder_type : null,
@@ -75,8 +102,6 @@ export default function AddTaskModal({ onClose, onTaskCreated }) {
           </button>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
-
         <form onSubmit={handleSubmit}>
           <div className="form-group">
             <label htmlFor="title">Name of the task</label>
@@ -109,6 +134,8 @@ export default function AddTaskModal({ onClose, onTaskCreated }) {
               id="due_date"
               name="due_date"
               type="date"
+              className="date-time-input"
+              style={NATIVE_PICKER_STYLE}
               value={form.due_date}
               onChange={handleChange}
               required
@@ -135,6 +162,8 @@ export default function AddTaskModal({ onClose, onTaskCreated }) {
                   id="reminder_time"
                   name="reminder_time"
                   type="time"
+                  className="date-time-input"
+                  style={NATIVE_PICKER_STYLE}
                   value={form.reminder_time}
                   onChange={handleChange}
                   required
@@ -159,6 +188,8 @@ export default function AddTaskModal({ onClose, onTaskCreated }) {
               </div>
             </>
           )}
+
+          {error && <div className="alert alert-error">{error}</div>}
 
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>

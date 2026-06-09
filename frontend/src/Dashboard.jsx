@@ -61,7 +61,6 @@ function sortTasks(tasks) {
 
 function sortTaskGroups(data) {
   return {
-    new: sortTasks(data.new || []),
     upcoming: sortTasks(data.upcoming || []),
     completed: sortTasks(data.completed || []),
   };
@@ -180,7 +179,6 @@ function TaskColumn({ title, tasks, columnClass, showEdit, onEdit, onDelete }) {
 
 function removeTaskFromState(tasks, taskId) {
   return {
-    new: tasks.new.filter((t) => t.id !== taskId),
     upcoming: tasks.upcoming.filter((t) => t.id !== taskId),
     completed: tasks.completed.filter((t) => t.id !== taskId),
   };
@@ -188,7 +186,7 @@ function removeTaskFromState(tasks, taskId) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [tasks, setTasks] = useState({ new: [], upcoming: [], completed: [] });
+  const [tasks, setTasks] = useState({ upcoming: [], completed: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -254,14 +252,6 @@ export default function Dashboard() {
         {error && <p className="error">{error}</p>}
         {!loading && !error && (
           <div className="task-columns">
-            <TaskColumn
-              title="New Tasks"
-              tasks={tasks.new}
-              columnClass="column-new"
-              showEdit
-              onEdit={setEditingTask}
-              onDelete={handleDelete}
-            />
             <TaskColumn
               title="Upcoming Tasks"
               tasks={tasks.upcoming}
