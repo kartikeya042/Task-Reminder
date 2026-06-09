@@ -12,24 +12,24 @@ export default function Signup() {
     captchaAnswer: '',
   });
   const [captchaToken, setCaptchaToken] = useState('');
-  const [captchaSvg, setCaptchaSvg] = useState('');
+  const [mathQuestion, setMathQuestion] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const fetchCaptcha = async () => {
+  const fetchMathCaptcha = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/captcha/image`);
+      const res = await fetch(`${API_BASE}/api/captcha/math`);
       const data = await res.json();
       setCaptchaToken(data.token);
-      setCaptchaSvg(data.svg);
+      setMathQuestion(data.question);
     } catch {
-      setError('Failed to load captcha. Please refresh.');
+      setError('Failed to load math captcha. Please refresh.');
     }
   };
 
   useEffect(() => {
-    fetchCaptcha();
+    fetchMathCaptcha();
   }, []);
 
   const handleChange = (e) => {
@@ -72,7 +72,8 @@ export default function Signup() {
 
       if (!res.ok) {
         setError(data.message || 'Signup failed');
-        fetchCaptcha();
+        fetchMathCaptcha();
+        setForm((prev) => ({ ...prev, captchaAnswer: '' }));
         return;
       }
 
@@ -82,7 +83,7 @@ export default function Signup() {
       }, 2000);
     } catch {
       setError('Network error. Is the backend running?');
-      fetchCaptcha();
+      fetchMathCaptcha();
     } finally {
       setLoading(false);
     }
@@ -159,28 +160,25 @@ export default function Signup() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="captchaAnswer">Image Captcha</label>
+            <label htmlFor="captchaAnswer">Math Captcha</label>
             <div className="captcha-row">
-              <div
-                className="captcha-image"
-                dangerouslySetInnerHTML={{ __html: captchaSvg }}
-              />
+              <div className="captcha-question">{mathQuestion}</div>
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={fetchCaptcha}
-                title="Refresh captcha"
+                onClick={fetchMathCaptcha}
+                title="New question"
               >
                 ↻
               </button>
               <input
                 id="captchaAnswer"
                 name="captchaAnswer"
-                type="text"
+                type="number"
                 value={form.captchaAnswer}
                 onChange={handleChange}
                 required
-                placeholder="Enter captcha"
+                placeholder="Answer"
                 style={{ flex: 1 }}
               />
             </div>

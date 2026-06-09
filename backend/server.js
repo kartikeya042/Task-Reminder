@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const mysql = require('mysql2/promise');
 const nodemailer = require('nodemailer');
 const svgCaptcha = require('svg-captcha');
+const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -253,12 +254,205 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// --- Tasks endpoint ---
+// --- Notification helpers ---
+
+function parseMysqlDate(date) {
+  if (!date) return null;
+  if (typeof date === 'string') {
+    return date.includes('T') ? date.split('T')[0] : date.slice(0, 10);
+  }
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function normalizeDueDate(dueDate) {
+  if (!dueDate) return null;
+  const str = parseMysqlDate(dueDate);
+  return /^\d{4}-\d{2}-\d{2}$/.test(str) ? str : null;
+}
+
+function formatTaskRow(task) {
+  return {
+    ...task,
+    due_date: task.due_date ? parseMysqlDate(task.due_date) : null,
+    has_reminder: Boolean(task.has_reminder),
+    reminder_time: task.reminder_time
+      ? String(task.reminder_time).slice(0, 8)
+      : null,
+  };
+}
+
+function getLocalDateTimeParts(now = new Date()) {
+  const currentLocalDate = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-');
+
+  const currentLocalTime = [
+    String(now.getHours()).padStart(2, '0'),
+    String(now.getMinutes()).padStart(2, '0'),
+  ].join(':');
+
+  return {
+    currentLocalDate,
+    currentLocalTime,
+    currentLocalMinute: now.getMinutes(),
+  };
+}
+
+function buildNotificationSlotKey(task, currentLocalDate, currentLocalTime) {
+  switch (task.reminder_type) {
+    case 'exact_time':
+      return `exact_time:${currentLocalDate}:${currentLocalTime}`;
+    case '30_min_prior':
+      return `30_min_prior:${currentLocalDate}:${currentLocalTime}`;
+    case '1_hour_prior':
+      return `1_hour_prior:${currentLocalDate}:${currentLocalTime}`;
+    case 'every_hour':
+      return `every_hour:${currentLocalDate}:${currentLocalTime.split(':')[0]}`;
+    default:
+      return null;
+  }
+}
+
+async function wasNotificationSent(taskId, slotKey) {
+  const [rows] = await pool.query(
+    'SELECT id FROM task_notification_log WHERE task_id = ? AND slot_key = ?',
+    [taskId, slotKey]
+  );
+  return rows.length > 0;
+}
+
+async function recordNotificationSent(taskId, slotKey) {
+  await pool.query(
+    'INSERT INTO task_notification_log (task_id, slot_key) VALUES (?, ?)',
+    [taskId, slotKey]
+  );
+}
+
+async function sendReminderEmail(email, task) {
+  const dueDate = parseMysqlDate(task.due_date);
+  const message = `Reminder for your task "${task.title}"${task.description ? `: ${task.description}` : ''}. Due date: ${dueDate}.`;
+
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      to: email,
+      subject: `Task Reminder: ${task.title}`,
+      html: `<h2>Task Reminder</h2><p>${message}</p>`,
+    });
+  } else {
+    console.log(`[DEV] Reminder email to ${email}: ${message}`);
+  }
+}
+
+// Stub — replace with Twilio, whatsapp-web.js, or another WhatsApp provider integration.
+async function sendWhatsAppNotification(mobile, message) {
+  console.log(`[WHATSAPP STUB] Sending message to ${mobile}: ${message}`);
+}
+
+async function autoCompleteExpiredTasks(currentLocalDate, currentLocalTime) {
+  const [result] = await pool.query(
+    `
+    UPDATE tasks
+    SET status = 'completed'
+    WHERE status = 'upcoming'
+      AND (
+        (has_reminder = TRUE AND reminder_time IS NOT NULL
+          AND TIMESTAMP(due_date, reminder_time) < TIMESTAMP(?, ?))
+        OR
+        ((has_reminder = FALSE OR reminder_time IS NULL)
+          AND due_date < ?)
+      )
+    `,
+    [currentLocalDate, `${currentLocalTime}:00`, currentLocalDate]
+  );
+
+  if (result.affectedRows > 0) {
+    console.log(`[CRON] Auto-completed ${result.affectedRows} expired task(s)`);
+  }
+}
+
+async function processReminderNotifications() {
+  const now = new Date();
+  const { currentLocalDate, currentLocalTime, currentLocalMinute } = getLocalDateTimeParts(now);
+
+  console.log(`[CRON TICK] Checking for reminders at Local Time: ${currentLocalTime}`);
+
+  try {
+    await autoCompleteExpiredTasks(currentLocalDate, currentLocalTime);
+
+    const [tasks] = await pool.query(
+      `
+      SELECT t.id, t.title, t.description, t.due_date, t.reminder_time, t.reminder_type,
+             t.has_reminder, u.email, u.mobile, u.name
+      FROM tasks t
+      JOIN users u ON t.user_id = u.id
+      WHERE t.has_reminder = TRUE
+        AND t.due_date = ?
+        AND t.reminder_time IS NOT NULL
+        AND t.reminder_type IS NOT NULL
+        AND t.status != 'completed'
+        AND (
+          (t.reminder_type = 'exact_time'
+            AND DATE_FORMAT(t.reminder_time, '%H:%i') = ?)
+          OR (t.reminder_type = '30_min_prior'
+            AND DATE_FORMAT(
+              DATE_SUB(CONCAT(t.due_date, ' ', t.reminder_time), INTERVAL 30 MINUTE),
+              '%H:%i'
+            ) = ?)
+          OR (t.reminder_type = '1_hour_prior'
+            AND DATE_FORMAT(
+              DATE_SUB(CONCAT(t.due_date, ' ', t.reminder_time), INTERVAL 60 MINUTE),
+              '%H:%i'
+            ) = ?)
+          OR (t.reminder_type = 'every_hour' AND ? = 0)
+        )
+      `,
+      [
+        currentLocalDate,
+        currentLocalTime,
+        currentLocalTime,
+        currentLocalTime,
+        currentLocalMinute,
+      ]
+    );
+
+    for (const task of tasks) {
+      const slotKey = buildNotificationSlotKey(task, currentLocalDate, currentLocalTime);
+      if (!slotKey) continue;
+
+      const alreadySent = await wasNotificationSent(task.id, slotKey);
+      if (alreadySent) continue;
+
+      const dueDate = parseMysqlDate(task.due_date);
+      const message = `Reminder: "${task.title}" is due on ${dueDate}.`;
+
+      await sendReminderEmail(task.email, task);
+      await sendWhatsAppNotification(task.mobile, message);
+      await recordNotificationSent(task.id, slotKey);
+
+      console.log(`[REMINDER] Sent for task #${task.id} (${slotKey})`);
+    }
+  } catch (err) {
+    console.error('Reminder cron error:', err);
+  }
+}
+
+cron.schedule('* * * * *', processReminderNotifications);
+
+// --- Tasks endpoints ---
 
 app.get('/api/tasks', authMiddleware, async (req, res) => {
   try {
     const [tasks] = await pool.query(
-      'SELECT id, title, description, status, due_date, created_at FROM tasks WHERE user_id = ? ORDER BY created_at DESC',
+      `SELECT id, title, description, status,
+              DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date,
+              has_reminder, reminder_time, reminder_type, created_at
+       FROM tasks WHERE user_id = ? ORDER BY created_at DESC`,
       [req.user.id]
     );
 
@@ -269,11 +463,12 @@ app.get('/api/tasks', authMiddleware, async (req, res) => {
     };
 
     for (const task of tasks) {
-      const status = (task.status || 'new').toLowerCase();
+      const formatted = formatTaskRow(task);
+      const status = (formatted.status || 'new').toLowerCase();
       if (grouped[status]) {
-        grouped[status].push(task);
+        grouped[status].push(formatted);
       } else {
-        grouped.new.push(task);
+        grouped.new.push(formatted);
       }
     }
 
@@ -281,6 +476,61 @@ app.get('/api/tasks', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('Tasks error:', err);
     res.status(500).json({ message: 'Server error fetching tasks' });
+  }
+});
+
+app.post('/api/tasks', authMiddleware, async (req, res) => {
+  try {
+    const { title, description, due_date, has_reminder, reminder_time, reminder_type } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ message: 'Task name is required' });
+    }
+
+    const normalizedDueDate = normalizeDueDate(due_date);
+    if (!normalizedDueDate) {
+      return res.status(400).json({ message: 'A valid reminder date (YYYY-MM-DD) is required' });
+    }
+
+    const wantsReminder = Boolean(has_reminder);
+
+    if (wantsReminder) {
+      if (!reminder_time) {
+        return res.status(400).json({ message: 'Reminder time is required when time reminder is enabled' });
+      }
+      const validTypes = ['exact_time', 'every_hour', '30_min_prior', '1_hour_prior'];
+      if (!reminder_type || !validTypes.includes(reminder_type)) {
+        return res.status(400).json({ message: 'A valid reminder type is required' });
+      }
+    }
+
+    const [result] = await pool.query(
+      `INSERT INTO tasks
+        (user_id, title, description, status, due_date, has_reminder, reminder_time, reminder_type)
+       VALUES (?, ?, ?, 'upcoming', ?, ?, ?, ?)`,
+      [
+        req.user.id,
+        title.trim(),
+        description?.trim() || null,
+        normalizedDueDate,
+        wantsReminder,
+        wantsReminder ? reminder_time : null,
+        wantsReminder ? reminder_type : null,
+      ]
+    );
+
+    const [rows] = await pool.query(
+      `SELECT id, title, description, status,
+              DATE_FORMAT(due_date, '%Y-%m-%d') AS due_date,
+              has_reminder, reminder_time, reminder_type, created_at
+       FROM tasks WHERE id = ?`,
+      [result.insertId]
+    );
+
+    res.status(201).json(formatTaskRow(rows[0]));
+  } catch (err) {
+    console.error('Create task error:', err);
+    res.status(500).json({ message: 'Server error creating task' });
   }
 });
 
@@ -295,4 +545,5 @@ app.get('/api/health', async (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Task Reminder API running on http://localhost:${PORT}`);
+  console.log('Reminder notification scheduler active (runs every minute)');
 });

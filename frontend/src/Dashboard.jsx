@@ -1,6 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from './api';
+import AddTaskModal from './AddTaskModal';
+
+function formatDueDate(dueDate) {
+  const raw = String(dueDate);
+  const dateStr = raw.includes('T') ? raw.split('T')[0] : raw.slice(0, 10);
+  const [year, month, day] = dateStr.split('-');
+  if (!year || !month || !day) return dateStr;
+  return `${day}-${month}-${year}`;
+}
 
 function TaskCard({ task }) {
   return (
@@ -9,7 +18,13 @@ function TaskCard({ task }) {
       {task.description && <p>{task.description}</p>}
       {task.due_date && (
         <span className="due-date">
-          Due: {new Date(task.due_date).toLocaleDateString()}
+          Due: {formatDueDate(task.due_date)}
+        </span>
+      )}
+      {task.has_reminder && task.reminder_time && (
+        <span className="reminder-badge">
+          Reminder: {String(task.reminder_time).slice(0, 5)}
+          {task.reminder_type && ` (${task.reminder_type.replace(/_/g, ' ')})`}
         </span>
       )}
     </div>
@@ -39,28 +54,30 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState({ new: [], upcoming: [], completed: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showModal, setShowModal] = useState(false);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const data = await apiFetch('/api/tasks');
-        setTasks(data);
-      } catch (err) {
-        if (err.message === 'Unauthorized' || err.message === 'Invalid or expired token') {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          navigate('/login');
-          return;
-        }
-        setError(err.message || 'Failed to load tasks');
-      } finally {
-        setLoading(false);
+  const fetchTasks = useCallback(async () => {
+    try {
+      const data = await apiFetch('/api/tasks');
+      setTasks(data);
+      setError('');
+    } catch (err) {
+      if (err.message === 'Unauthorized' || err.message === 'Invalid or expired token') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
       }
-    };
-
-    fetchTasks();
+      setError(err.message || 'Failed to load tasks');
+    } finally {
+      setLoading(false);
+    }
   }, [navigate]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -74,6 +91,9 @@ export default function Dashboard() {
         <h1>Task Reminder</h1>
         <div className="user-info">
           {user.name && <span className="user-name">Hello, {user.name}</span>}
+          <button type="button" className="btn btn-primary btn-inline" onClick={() => setShowModal(true)}>
+            Add New Task
+          </button>
           <button type="button" className="btn btn-danger" onClick={handleLogout}>
             Logout
           </button>
@@ -103,6 +123,13 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+
+      {showModal && (
+        <AddTaskModal
+          onClose={() => setShowModal(false)}
+          onTaskCreated={fetchTasks}
+        />
+      )}
     </div>
   );
 }
