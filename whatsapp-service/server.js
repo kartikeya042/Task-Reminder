@@ -44,7 +44,18 @@ function formatWhatsAppNumber(mobile) {
 const chromeExecutablePath = resolveChromeExecutablePath();
 const puppeteerOptions = {
   headless: true,
-  args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--disable-gpu',
+    '--disable-features=IsolateOrigins,site-per-process',
+    '--disable-features=MemorySaverMode',
+    '--memory-pressure-off',
+  ],
 };
 
 if (chromeExecutablePath) {
@@ -55,7 +66,7 @@ if (chromeExecutablePath) {
 }
 
 const client = new Client({
-  authStrategy: new LocalAuth(),
+  authStrategy: new LocalAuth({ clientId: 'task-bot' }),
   puppeteer: puppeteerOptions,
 });
 
@@ -71,12 +82,25 @@ client.on('ready', () => {
 
 client.on('auth_failure', (msg) => {
   isClientReady = false;
-  console.error('[WHATSAPP] Authentication failure:', msg);
+  console.error(
+    '[WHATSAPP] Session is invalid — authentication failed. Delete the .wwebjs_auth folder and scan a new QR code.',
+    msg
+  );
 });
 
 client.on('disconnected', (reason) => {
   isClientReady = false;
-  console.warn('[WHATSAPP] Client disconnected:', reason);
+  console.warn(
+    '[WHATSAPP] Linked device was removed from the phone. Resetting session to generate a new QR code. Reason:',
+    reason
+  );
+
+  client
+    .destroy()
+    .then(() => client.initialize())
+    .catch((err) => {
+      console.error('[WHATSAPP] Failed to reset after disconnect:', err.message);
+    });
 });
 
 client.initialize().catch((err) => {
@@ -113,5 +137,21 @@ app.post('/send-message', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`WhatsApp microservice running on http://localhost:${PORT}`);
+  console.log(`WhatsApp microservice running on port ${PORT}`);
 });
+
+async function gracefulShutdown(signal) {
+  console.log(`[WHATSAPP] Received ${signal}, shutting down gracefully...`);
+
+  try {
+    await client.destroy();
+    console.log('[WHATSAPP] Browser was safely closed.');
+  } catch (err) {
+    console.error('[WHATSAPP] Error closing browser during shutdown:', err.message);
+  }
+
+  process.exit(0);
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
