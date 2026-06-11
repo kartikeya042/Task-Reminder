@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { API_BASE } from './api';
+import { apiUrl } from './api';
 import PasswordInput from './PasswordInput';
 
 export default function Login() {
@@ -18,7 +18,7 @@ export default function Login() {
 
   const fetchMathCaptcha = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/captcha/math`);
+      const res = await fetch(apiUrl('/api/captcha/math'));
       const data = await res.json();
       setCaptchaToken(data.token);
       setMathQuestion(data.question);
@@ -34,7 +34,7 @@ export default function Login() {
   useEffect(() => {
     const fetchVisitorCount = async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/visitor-count`);
+        const res = await fetch(apiUrl('/api/visitor-count'));
         const data = await res.json();
         if (res.ok) {
           setVisitorCount(data.visitor_count);
@@ -69,7 +69,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      const res = await fetch(apiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { API_BASE } from './api';
+import { apiUrl } from './api';
 import PasswordInput from './PasswordInput';
 
 export default function ResetPassword() {
@@ -34,7 +34,7 @@ export default function ResetPassword() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/reset-password`, {
+      const res = await fetch(apiUrl('/api/auth/reset-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp, newPassword }),

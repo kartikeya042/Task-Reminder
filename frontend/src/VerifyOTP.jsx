@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { API_BASE } from './api';
+import { apiUrl } from './api';
 
 export default function VerifyOTP() {
   const [searchParams] = useSearchParams();
@@ -20,7 +20,7 @@ export default function VerifyOTP() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/verify`, {
+      const res = await fetch(apiUrl('/api/auth/verify'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp }),

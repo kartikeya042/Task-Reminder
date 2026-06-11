@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { API_BASE } from './api';
+import { apiUrl } from './api';
 
 export default function AdminPanel() {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ export default function AdminPanel() {
       const token = localStorage.getItem('token');
 
       try {
-        const res = await fetch(`${API_BASE}/api/admin/stats`, {
+        const res = await fetch(apiUrl('/api/admin/stats'), {
           headers: {
             Authorization: `Bearer ${token}`,
           },
