@@ -79,7 +79,7 @@ function generateMathCaptcha() {
   return { question, answer };
 }
 
-function authMiddleware(req, res, next) {
+function authenticateToken(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ message: 'Unauthorized' });
@@ -91,6 +91,13 @@ function authMiddleware(req, res, next) {
   } catch {
     return res.status(401).json({ message: 'Invalid or expired token' });
   }
+}
+
+function verifyAdmin(req, res, next) {
+  if (!req.user?.is_admin) {
+    return res.status(403).json({ message: 'Access denied' });
+  }
+  next();
 }
 
 // --- Captcha endpoints ---
@@ -219,7 +226,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      'SELECT id, name, email, password_hash, is_active FROM users WHERE email = ?',
+      'SELECT id, name, email, password_hash, is_active, is_admin FROM users WHERE email = ?',
       [email]
     );
 
@@ -238,8 +245,10 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(403).json({ message: 'Account not verified. Please verify your email first.' });
     }
 
+    const isAdmin = Boolean(user.is_admin);
+
     const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name },
+      { id: user.id, email: user.email, name: user.name, is_admin: isAdmin },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -247,7 +256,7 @@ app.post('/api/auth/login', async (req, res) => {
     res.json({
       message: 'Login successful',
       token,
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, is_admin: isAdmin },
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -549,7 +558,29 @@ cron.schedule('* * * * *', processReminderNotifications);
 
 // --- Tasks endpoints ---
 
-app.get('/api/tasks', authMiddleware, async (req, res) => {
+app.get('/api/admin/stats', authenticateToken, verifyAdmin, async (_req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        SUM(CASE WHEN t.status = 'upcoming' THEN 1 ELSE 0 END) AS pending_tasks,
+        SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) AS completed_tasks
+      FROM users u
+      LEFT JOIN tasks t ON t.user_id = u.id
+      GROUP BY u.id, u.name, u.email
+      ORDER BY u.id
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error('Admin stats error:', err);
+    res.status(500).json({ message: 'Server error fetching admin stats' });
+  }
+});
+
+app.get('/api/tasks', authenticateToken, async (req, res) => {
   try {
     const [tasks] = await pool.query(
       `SELECT id, title, description, status,
@@ -581,7 +612,7 @@ app.get('/api/tasks', authMiddleware, async (req, res) => {
   }
 });
 
-app.post('/api/tasks', authMiddleware, async (req, res) => {
+app.post('/api/tasks', authenticateToken, async (req, res) => {
   try {
     const { title, description, due_date, status, has_reminder, reminder_time, reminder_type } = req.body;
 
@@ -640,7 +671,7 @@ app.post('/api/tasks', authMiddleware, async (req, res) => {
   }
 });
 
-app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
+app.put('/api/tasks/:id', authenticateToken, async (req, res) => {
   try {
     const taskId = req.params.id;
     const { title, description, due_date, status, has_reminder, reminder_time, reminder_type } = req.body;
@@ -713,7 +744,7 @@ app.put('/api/tasks/:id', authMiddleware, async (req, res) => {
   }
 });
 
-app.delete('/api/tasks/:id', authMiddleware, async (req, res) => {
+app.delete('/api/tasks/:id', authenticateToken, async (req, res) => {
   try {
     const [result] = await pool.query(
       'DELETE FROM tasks WHERE id = ? AND user_id = ?',

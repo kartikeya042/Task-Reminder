@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from './api';
 import AddTaskModal from './AddTaskModal';
 import EditTaskModal from './EditTaskModal';
@@ -238,6 +238,11 @@ export default function Dashboard() {
         <h1>Task Reminder</h1>
         <div className="user-info">
           {user.name && <span className="user-name">Hello, {user.name}</span>}
+          {user.is_admin && (
+            <Link to="/admin" className="btn btn-secondary btn-inline">
+              Go to Admin Panel
+            </Link>
+          )}
           <button type="button" className="btn btn-primary btn-inline" onClick={() => setShowAddModal(true)}>
             Add New Task
           </button>

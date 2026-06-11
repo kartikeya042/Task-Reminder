@@ -5,6 +5,7 @@ import VerifyOTP from './VerifyOTP';
 import ForgotPassword from './ForgotPassword';
 import ResetPassword from './ResetPassword';
 import Dashboard from './Dashboard';
+import AdminPanel from './AdminPanel';
 
 function ProtectedRoute({ children }) {
   const token = localStorage.getItem('token');
@@ -65,6 +66,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminPanel />
             </ProtectedRoute>
           }
         />
