@@ -11,9 +11,8 @@ const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
-const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:5001';
 
 // In-memory captcha store: token -> { value, expiresAt }
 const captchaStore = new Map();
@@ -23,11 +22,11 @@ app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173', cred
 app.use(express.json());
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',
+  host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'task_reminder',
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
   waitForConnections: true,
   connectionLimit: 10,
 });
@@ -450,8 +449,14 @@ async function sendReminderEmail(email, task) {
 }
 
 async function sendWhatsAppNotification(mobile, message) {
+  const serviceUrl = process.env.WHATSAPP_SERVICE_URL;
+  if (!serviceUrl) {
+    console.error('[WHATSAPP-SERVICE ERROR] WHATSAPP_SERVICE_URL is not configured');
+    return;
+  }
+
   try {
-    const response = await fetch(`${WHATSAPP_SERVICE_URL}/send-message`, {
+    const response = await fetch(`${serviceUrl}/send-message`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mobile, message }),
@@ -793,6 +798,6 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Task Reminder API running on http://localhost:${PORT}`);
+  console.log(`Task Reminder API running on port ${PORT}`);
   console.log('Reminder notification scheduler active (runs every minute)');
 });
