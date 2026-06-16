@@ -92,8 +92,24 @@ function authenticateToken(req, res, next) {
   }
 }
 
+function resolveUserRole(user) {
+  if (user.role) return user.role;
+  return user.is_admin ? 'admin' : 'user';
+}
+
 function verifyAdmin(req, res, next) {
-  if (!req.user?.is_admin) {
+  const role = req.user?.role;
+  if (role === 'admin' || role === 'superadmin') {
+    return next();
+  }
+  if (req.user?.is_admin) {
+    return next();
+  }
+  return res.status(403).json({ message: 'Access denied' });
+}
+
+function verifySuperAdmin(req, res, next) {
+  if (req.user?.role !== 'superadmin') {
     return res.status(403).json({ message: 'Access denied' });
   }
   next();
@@ -225,7 +241,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      'SELECT id, name, email, password_hash, is_active, is_admin FROM users WHERE email = ?',
+      'SELECT id, name, email, password_hash, is_active, is_admin, role FROM users WHERE email = ?',
       [email]
     );
 
@@ -244,10 +260,11 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(403).json({ message: 'Account not verified. Please verify your email first.' });
     }
 
-    const isAdmin = Boolean(user.is_admin);
+    const role = resolveUserRole(user);
+    const isAdmin = role === 'admin' || role === 'superadmin';
 
     const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, is_admin: isAdmin },
+      { id: user.id, email: user.email, name: user.name, role, is_admin: isAdmin },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
@@ -255,7 +272,7 @@ app.post('/api/auth/login', async (req, res) => {
     res.json({
       message: 'Login successful',
       token,
-      user: { id: user.id, name: user.name, email: user.email, is_admin: isAdmin },
+      user: { id: user.id, name: user.name, email: user.email, role, is_admin: isAdmin },
     });
   } catch (err) {
     console.error('Login error:', err);
@@ -626,11 +643,12 @@ app.get('/api/admin/stats', authenticateToken, verifyAdmin, async (_req, res) =>
         u.id,
         u.name,
         u.email,
+        COALESCE(u.role, IF(u.is_admin, 'admin', 'user')) AS role,
         SUM(CASE WHEN t.status = 'upcoming' THEN 1 ELSE 0 END) AS pending_tasks,
         SUM(CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END) AS completed_tasks
       FROM users u
       LEFT JOIN tasks t ON t.user_id = u.id
-      GROUP BY u.id, u.name, u.email
+      GROUP BY u.id, u.name, u.email, u.role, u.is_admin
       ORDER BY u.id
     `);
 
@@ -638,6 +656,73 @@ app.get('/api/admin/stats', authenticateToken, verifyAdmin, async (_req, res) =>
   } catch (err) {
     console.error('Admin stats error:', err);
     res.status(500).json({ message: 'Server error fetching admin stats' });
+  }
+});
+
+app.get('/api/admin/users', authenticateToken, verifySuperAdmin, async (_req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT
+        id,
+        name,
+        email,
+        mobile,
+        COALESCE(role, IF(is_admin, 'admin', 'user')) AS role,
+        is_active,
+        created_at
+      FROM users
+      ORDER BY id
+    `);
+
+    res.json(rows);
+  } catch (err) {
+    console.error('Admin users error:', err);
+    res.status(500).json({ message: 'Server error fetching users' });
+  }
+});
+
+app.put('/api/admin/users/:id/role', authenticateToken, verifySuperAdmin, async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const { role } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ message: 'Invalid user id' });
+    }
+
+    if (!role || !['admin', 'user'].includes(role)) {
+      return res.status(400).json({ message: "Role must be 'admin' or 'user'" });
+    }
+
+    if (userId === req.user.id) {
+      return res.status(400).json({ message: 'You cannot change your own role' });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, COALESCE(role, IF(is_admin, \'admin\', \'user\')) AS role FROM users WHERE id = ?',
+      [userId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const targetUser = rows[0];
+
+    if (targetUser.role === 'superadmin') {
+      return res.status(403).json({ message: 'Cannot modify a superadmin account' });
+    }
+
+    await pool.query('UPDATE users SET role = ?, is_admin = ? WHERE id = ?', [
+      role,
+      role === 'admin' ? 1 : 0,
+      userId,
+    ]);
+
+    res.json({ message: 'User role updated successfully', role });
+  } catch (err) {
+    console.error('Update user role error:', err);
+    res.status(500).json({ message: 'Server error updating user role' });
   }
 });
 

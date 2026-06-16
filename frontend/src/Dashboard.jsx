@@ -238,7 +238,7 @@ export default function Dashboard() {
         <h1>Yadhwala</h1>
         <div className="user-info">
           {user.name && <span className="user-name">Hello, {user.name}</span>}
-          {user.is_admin && (
+          {(user.role === 'admin' || user.role === 'superadmin' || user.is_admin) && (
             <Link to="/admin" className="btn btn-secondary btn-inline">
               Go to Admin Panel
             </Link>

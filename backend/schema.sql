@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   otp VARCHAR(6) DEFAULT NULL,
   is_active TINYINT(1) NOT NULL DEFAULT 0,
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+  role ENUM('user', 'admin', 'superadmin') NOT NULL DEFAULT 'user',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

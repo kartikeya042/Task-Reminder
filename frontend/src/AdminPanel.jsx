@@ -1,53 +1,98 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiUrl } from './api';
 
+function authHeaders() {
+  const token = localStorage.getItem('token');
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+function RoleBadge({ role }) {
+  const label = role || 'user';
+  return <span className={`admin-role-badge admin-role-${label}`}>{label}</span>;
+}
+
 export default function AdminPanel() {
   const navigate = useNavigate();
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const isSuperAdmin = currentUser.role === 'superadmin';
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [accessDenied, setAccessDenied] = useState(false);
+  const [actionUserId, setActionUserId] = useState(null);
+
+  const columnCount = isSuperAdmin ? 7 : 5;
+
+  const fetchAdminData = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const res = await fetch(apiUrl('/api/admin/stats'), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 403) {
+        setAccessDenied(true);
+        return;
+      }
+
+      if (res.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to load admin data');
+      }
+
+      setUsers(data);
+    } catch (err) {
+      setError(err.message || 'Failed to load admin data');
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      const token = localStorage.getItem('token');
+    fetchAdminData();
+  }, [fetchAdminData]);
 
-      try {
-        const res = await fetch(apiUrl('/api/admin/stats'), {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+  const handleRoleChange = async (userId, role) => {
+    setError('');
+    setActionUserId(userId);
 
-        const data = await res.json().catch(() => ({}));
+    try {
+      const res = await fetch(apiUrl(`/api/admin/users/${userId}/role`), {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ role }),
+      });
 
-        if (res.status === 403) {
-          setAccessDenied(true);
-          return;
-        }
+      const data = await res.json().catch(() => ({}));
 
-        if (res.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          navigate('/login');
-          return;
-        }
-
-        if (!res.ok) {
-          throw new Error(data.message || 'Failed to load admin stats');
-        }
-
-        setUsers(data);
-      } catch (err) {
-        setError(err.message || 'Failed to load admin stats');
-      } finally {
-        setLoading(false);
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to update user role');
       }
-    };
 
-    fetchStats();
-  }, [navigate]);
+      await fetchAdminData();
+    } catch (err) {
+      setError(err.message || 'Failed to update user role');
+    } finally {
+      setActionUserId(null);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -62,7 +107,7 @@ export default function AdminPanel() {
           <h1>Admin Panel</h1>
         </header>
         <main className="admin-content">
-          <p className="loading">Loading user statistics…</p>
+          <p className="loading">Loading admin data…</p>
         </main>
       </div>
     );
@@ -94,6 +139,9 @@ export default function AdminPanel() {
       <header className="dashboard-header">
         <h1>Admin Panel</h1>
         <div className="user-info">
+          {isSuperAdmin && (
+            <span className="admin-header-badge">Superadmin</span>
+          )}
           <Link to="/dashboard" className="btn btn-secondary btn-inline">
             Back to Dashboard
           </Link>
@@ -122,25 +170,70 @@ export default function AdminPanel() {
                     <th>Email</th>
                     <th>Pending Tasks</th>
                     <th>Completed Tasks</th>
+                    {isSuperAdmin && <th>Role</th>}
+                    {isSuperAdmin && <th>Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="admin-table-empty">
+                      <td colSpan={columnCount} className="admin-table-empty">
                         No registered users found.
                       </td>
                     </tr>
                   ) : (
-                    users.map((user) => (
-                      <tr key={user.id}>
-                        <td>{user.id}</td>
-                        <td>{user.name}</td>
-                        <td>{user.email}</td>
-                        <td>{Number(user.pending_tasks)}</td>
-                        <td>{Number(user.completed_tasks)}</td>
-                      </tr>
-                    ))
+                    users.map((user) => {
+                      const isSelf = user.id === currentUser.id;
+                      const canManage =
+                        isSuperAdmin &&
+                        !isSelf &&
+                        user.role !== 'superadmin';
+
+                      return (
+                        <tr key={user.id}>
+                          <td>{user.id}</td>
+                          <td>{user.name}</td>
+                          <td>{user.email}</td>
+                          <td>{Number(user.pending_tasks)}</td>
+                          <td>{Number(user.completed_tasks)}</td>
+                          {isSuperAdmin && (
+                            <td>
+                              <RoleBadge role={user.role} />
+                            </td>
+                          )}
+                          {isSuperAdmin && (
+                            <td>
+                              {canManage ? (
+                                <div className="admin-actions">
+                                  {user.role === 'user' && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-primary btn-inline admin-action-btn"
+                                      disabled={actionUserId === user.id}
+                                      onClick={() => handleRoleChange(user.id, 'admin')}
+                                    >
+                                      {actionUserId === user.id ? 'Saving…' : 'Promote to Admin'}
+                                    </button>
+                                  )}
+                                  {user.role === 'admin' && (
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-inline admin-action-btn"
+                                      disabled={actionUserId === user.id}
+                                      onClick={() => handleRoleChange(user.id, 'user')}
+                                    >
+                                      {actionUserId === user.id ? 'Saving…' : 'Revoke Admin'}
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="admin-actions-muted">—</span>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
