@@ -1,0 +1,3 @@
+[submodule "whatsapp-service"]
+	path = whatsapp-service
+	url = https://github.com/kartikeya042/whatsapp-service.git
