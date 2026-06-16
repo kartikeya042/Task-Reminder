@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { apiFetch } from './api';
 import AddTaskModal from './AddTaskModal';
 import EditTaskModal from './EditTaskModal';
+import LogoutConfirmModal from './LogoutConfirmModal';
 
 function formatDueDate(dueDate) {
   const raw = String(dueDate);
@@ -191,6 +192,7 @@ export default function Dashboard() {
   const [error, setError] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const user = JSON.parse(localStorage.getItem('user') || '{}');
 
   const fetchTasks = useCallback(async () => {
@@ -246,7 +248,7 @@ export default function Dashboard() {
           <button type="button" className="btn btn-primary btn-inline" onClick={() => setShowAddModal(true)}>
             Add New Task
           </button>
-          <button type="button" className="btn btn-danger" onClick={handleLogout}>
+          <button type="button" className="btn btn-danger" onClick={() => setShowLogoutModal(true)}>
             Logout
           </button>
         </div>
@@ -291,6 +293,12 @@ export default function Dashboard() {
           onTaskUpdated={fetchTasks}
         />
       )}
+
+      <LogoutConfirmModal
+        open={showLogoutModal}
+        onCancel={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+      />
     </div>
   );
 }

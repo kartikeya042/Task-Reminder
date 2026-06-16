@@ -659,6 +659,55 @@ a:hover {
   min-width: 110px;
 }
 
+/* Logout confirmation modal */
+.logout-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 50;
+}
+
+.logout-modal-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem 1.5rem;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
+  text-align: center;
+}
+
+.logout-modal-title {
+  font-size: 1.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.logout-modal-text {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.logout-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.5rem;
+}
+
+.logout-modal-actions .btn {
+  width: auto;
+  min-width: 120px;
+}
+
 /* Admin Panel */
 .admin-panel {
   min-height: 100vh;

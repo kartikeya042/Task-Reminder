@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { apiUrl } from './api';
+import LogoutConfirmModal from './LogoutConfirmModal';
 
 function authHeaders() {
   const token = localStorage.getItem('token');
@@ -25,6 +26,7 @@ export default function AdminPanel() {
   const [error, setError] = useState('');
   const [accessDenied, setAccessDenied] = useState(false);
   const [actionUserId, setActionUserId] = useState(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const columnCount = isSuperAdmin ? 7 : 5;
 
@@ -145,7 +147,7 @@ export default function AdminPanel() {
           <Link to="/dashboard" className="btn btn-secondary btn-inline">
             Back to Dashboard
           </Link>
-          <button type="button" className="btn btn-danger" onClick={handleLogout}>
+          <button type="button" className="btn btn-danger" onClick={() => setShowLogoutModal(true)}>
             Logout
           </button>
         </div>
@@ -241,6 +243,12 @@ export default function AdminPanel() {
           </>
         )}
       </main>
+
+      <LogoutConfirmModal
+        open={showLogoutModal}
+        onCancel={() => setShowLogoutModal(false)}
+        onConfirm={handleLogout}
+      />
     </div>
   );
 }

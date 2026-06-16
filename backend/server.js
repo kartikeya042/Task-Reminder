@@ -492,9 +492,12 @@ async function sendReminderEmail(email, task) {
 
   if (process.env.SMTP_USER && process.env.SMTP_PASS) {
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      from: {
+        name: 'Yadhwala',
+        address: process.env.SMTP_USER,
+      },
       to: email,
-      subject: `Yadhwala: ${task.title}`,
+      subject: `Task Reminder: ${task.title}`,
       html: `<h2>Yadhwala</h2><p>${message}</p>`,
     });
   } else {
