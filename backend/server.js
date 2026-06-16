@@ -654,10 +654,18 @@ async function processReminderNotifications() {
   }
 }
 
-app.get('/api/trigger-reminders', (_req, res) => {
+app.get('/api/trigger-reminders', (req, res) => {
+  const { secret } = req.query;
+  
+  // Check against a secure password in your .env file
+  if (secret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+
   res.status(200).json({ message: 'Reminder check triggered' });
+  
   processReminderNotifications().catch((err) => {
-    console.error('Background reminder trigger error:', err);
+    console.error('[CRON] Background processing error:', err);
   });
 });
 
