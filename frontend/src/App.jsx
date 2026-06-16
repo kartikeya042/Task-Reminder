@@ -1,4 +1,10 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import PublicLayout from './layouts/PublicLayout';
+import Home from './pages/Home';
+import About from './pages/About';
+import Testimonials from './pages/Testimonials';
+import Contact from './pages/Contact';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 import Signup from './Signup';
 import Login from './Login';
 import VerifyOTP from './VerifyOTP';
@@ -27,7 +33,14 @@ export default function App() {
   return (
     <div className="app-container">
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route element={<PublicLayout />}>
+          <Route index element={<Home />} />
+          <Route path="about" element={<About />} />
+          <Route path="testimonials" element={<Testimonials />} />
+          <Route path="contact" element={<Contact />} />
+          <Route path="privacy" element={<PrivacyPolicy />} />
+        </Route>
+
         <Route
           path="/signup"
           element={
@@ -77,7 +90,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );

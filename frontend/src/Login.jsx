@@ -103,6 +103,9 @@ export default function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <Link to="/" className="auth-back-link">
+          &larr; Back to Home
+        </Link>
         <h1>Welcome Back</h1>
         <p className="subtitle">Log in to your Yadhwala account</p>
 

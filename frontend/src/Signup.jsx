@@ -110,6 +110,9 @@ export default function Signup() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <Link to="/" className="auth-back-link">
+          &larr; Back to Home
+        </Link>
         <h1>Create Account</h1>
         <p className="subtitle">Sign up for Yadhwala</p>
 
