@@ -7,7 +7,6 @@ const jwt = require('jsonwebtoken');
 const mysql = require('mysql2/promise');
 const nodemailer = require('nodemailer');
 const svgCaptcha = require('svg-captcha');
-const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
@@ -655,7 +654,12 @@ async function processReminderNotifications() {
   }
 }
 
-cron.schedule('* * * * *', processReminderNotifications);
+app.get('/api/trigger-reminders', (_req, res) => {
+  res.status(200).json({ message: 'Reminder check triggered' });
+  processReminderNotifications().catch((err) => {
+    console.error('Background reminder trigger error:', err);
+  });
+});
 
 // --- Tasks endpoints ---
 
@@ -963,5 +967,5 @@ app.get('/api/health', async (_req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Yadhwala API running on port ${PORT}`);
-  console.log('Reminder notification scheduler active (runs every minute)');
+  console.log('Reminder checks available at GET /api/trigger-reminders (use external cron)');
 });
