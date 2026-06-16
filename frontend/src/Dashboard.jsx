@@ -235,7 +235,7 @@ export default function Dashboard() {
   return (
     <div className="dashboard">
       <header className="dashboard-header">
-        <h1>Task Reminder</h1>
+        <h1>Yadhwala</h1>
         <div className="user-info">
           {user.name && <span className="user-name">Hello, {user.name}</span>}
           {user.is_admin && (

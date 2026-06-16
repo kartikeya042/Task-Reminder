@@ -111,7 +111,7 @@ export default function Signup() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>Create Account</h1>
-        <p className="subtitle">Sign up for Task Reminder</p>
+        <p className="subtitle">Sign up for Yadhwala</p>
 
         {error && <div className="alert alert-error">{error}</div>}
         {success && <div className="alert alert-success">{success}</div>}

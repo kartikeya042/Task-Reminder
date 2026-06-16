@@ -104,7 +104,7 @@ export default function Login() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>Welcome Back</h1>
-        <p className="subtitle">Log in to your Task Reminder account</p>
+        <p className="subtitle">Log in to your Yadhwala account</p>
 
         {error && <div className="alert alert-error">{error}</div>}
 

@@ -1,7 +1,7 @@
 {
   "name": "task-reminder-backend",
   "version": "1.0.0",
-  "description": "Task Reminder API server",
+  "description": "Yadhwala API server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

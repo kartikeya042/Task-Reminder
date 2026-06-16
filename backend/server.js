@@ -152,9 +152,9 @@ app.post('/api/auth/signup', async (req, res) => {
       await transporter.sendMail({
         from: process.env.EMAIL_FROM || process.env.SMTP_USER,
         to: email,
-        subject: 'Verify your Task Reminder account',
+        subject: 'Verify your Yadhwala account',
         html: `
-          <h2>Welcome to Task Reminder!</h2>
+          <h2>Welcome to Yadhwala!</h2>
           <p>Your verification OTP is: <strong>${otp}</strong></p>
           <p>Or click the link below to verify your account:</p>
           <p><a href="${verifyLink}">${verifyLink}</a></p>
@@ -294,7 +294,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       await transporter.sendMail({
         from: process.env.EMAIL_FROM || process.env.SMTP_USER,
         to: email,
-        subject: 'Reset your Task Reminder password',
+        subject: 'Reset your Yadhwala password',
         html: `
           <h2>Password Reset</h2>
           <p>Your password reset OTP is: <strong>${otp}</strong></p>
@@ -426,8 +426,9 @@ async function wasNotificationSent(taskId, slotKey) {
 }
 
 async function recordNotificationSent(taskId, slotKey) {
+  // FIX 1: Added IGNORE to prevent duplicate entry crashes
   await pool.query(
-    'INSERT INTO task_notification_log (task_id, slot_key) VALUES (?, ?)',
+    'INSERT IGNORE INTO task_notification_log (task_id, slot_key) VALUES (?, ?)',
     [taskId, slotKey]
   );
 }
@@ -440,8 +441,8 @@ async function sendReminderEmail(email, task) {
     await transporter.sendMail({
       from: process.env.EMAIL_FROM || process.env.SMTP_USER,
       to: email,
-      subject: `Task Reminder: ${task.title}`,
-      html: `<h2>Task Reminder</h2><p>${message}</p>`,
+      subject: `Yadhwala: ${task.title}`,
+      html: `<h2>Yadhwala</h2><p>${message}</p>`,
     });
   } else {
     console.log(`[DEV] Reminder email to ${email}: ${message}`);
@@ -493,7 +494,24 @@ async function autoCompleteExpiredTasks(currentLocalDate, currentLocalTime) {
   }
 }
 
+// FIX 2: Added processing lock to prevent overlapping cron runs
+let isProcessingReminders = false;
+
 async function processReminderNotifications() {
+  // --- ADDED: RENDER HEARTBEAT PING ---
+  // This sends an HTTP request to your Render server every time this cron runs
+  // to ensure the 15-minute inactivity timer resets.
+  fetch('https://whatsapp-service-b2rl.onrender.com/health').catch((err) => {
+    console.log('[HEARTBEAT] Render wake-up ping failed quietly:', err.message);
+  });
+
+  if (isProcessingReminders) {
+    console.log('[CRON TICK] Previous job still running (network delay), skipping this minute.');
+    return;
+  }
+
+  isProcessingReminders = true; // Lock
+
   const now = new Date();
   const { currentLocalDate, currentLocalTime, currentLocalMinute } = getLocalDateTimeParts(now);
 
@@ -556,6 +574,8 @@ async function processReminderNotifications() {
     }
   } catch (err) {
     console.error('Reminder cron error:', err);
+  } finally {
+    isProcessingReminders = false; // Always unlock when finished
   }
 }
 
@@ -798,6 +818,6 @@ app.get('/api/health', async (_req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Task Reminder API running on port ${PORT}`);
+  console.log(`Yadhwala API running on port ${PORT}`);
   console.log('Reminder notification scheduler active (runs every minute)');
 });

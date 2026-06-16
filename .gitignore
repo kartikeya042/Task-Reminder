@@ -8,5 +8,8 @@ dist/
 .wwebjs_cache/
 whatsapp-service/.wwebjs_auth/
 whatsapp-service/.wwebjs_cache/
+whatsapp-service/auth_info_baileys/
 
 !.env.example
+
+*.zip

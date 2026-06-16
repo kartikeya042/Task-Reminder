@@ -1,4 +1,4 @@
-# Task Reminder
+# Yadhwala
 
 A full-stack task management web application with secure authentication, email verification, and a kanban-style dashboard that groups tasks by status.
 
@@ -208,7 +208,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=your_email@gmail.com
 SMTP_PASS=your_16_char_app_password
-EMAIL_FROM=Task Reminder <your_email@gmail.com>
+EMAIL_FROM=Yadhwala <your_email@gmail.com>
 ```
 
 ## Scripts
