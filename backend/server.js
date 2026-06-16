@@ -353,6 +353,42 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { name, email, subject } = req.body;
+
+    if (!name?.trim() || !email?.trim() || !subject?.trim()) {
+      return res.status(400).json({ message: 'Name, email, and subject are required' });
+    }
+
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      return res.status(503).json({ message: 'Email service is not configured' });
+    }
+
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+    const trimmedSubject = subject.trim();
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+      to: process.env.SMTP_USER,
+      replyTo: trimmedEmail,
+      subject: trimmedSubject,
+      html: `
+        <h2>New Contact Form Submission</h2>
+        <p><strong>Name:</strong> ${trimmedName}</p>
+        <p><strong>Email:</strong> ${trimmedEmail}</p>
+        <p><strong>Subject:</strong> ${trimmedSubject}</p>
+      `,
+    });
+
+    res.status(200).json({ message: 'Message sent successfully' });
+  } catch (err) {
+    console.error('Contact form error:', err);
+    res.status(500).json({ message: 'Failed to send message. Please try again later.' });
+  }
+});
+
 // --- Notification helpers ---
 
 function parseMysqlDate(date) {

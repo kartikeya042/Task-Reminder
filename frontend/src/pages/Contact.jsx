@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { apiUrl } from '../api';
 
 function TwitterIcon() {
   return (
@@ -27,15 +28,43 @@ function InstagramIcon() {
 export default function Contact() {
   const [form, setForm] = useState({ name: '', email: '', subject: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    setError('');
+    setLoading(true);
+
+    try {
+      const res = await fetch(apiUrl('/api/contact'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          subject: form.subject,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data.message || 'Failed to send message. Please try again.');
+        return;
+      }
+
+      setSubmitted(true);
+    } catch {
+      setError('Network error. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -70,6 +99,8 @@ export default function Contact() {
             </div>
           ) : (
             <>
+              {error && <div className="alert alert-error">{error}</div>}
+
               <div className="form-group">
                 <label htmlFor="contact-name">Name</label>
                 <input
@@ -79,6 +110,7 @@ export default function Contact() {
                   value={form.name}
                   onChange={handleChange}
                   required
+                  disabled={loading}
                   placeholder="Your full name"
                 />
               </div>
@@ -91,6 +123,7 @@ export default function Contact() {
                   value={form.email}
                   onChange={handleChange}
                   required
+                  disabled={loading}
                   placeholder="you@example.com"
                 />
               </div>
@@ -103,11 +136,12 @@ export default function Contact() {
                   value={form.subject}
                   onChange={handleChange}
                   required
+                  disabled={loading}
                   placeholder="How can we help?"
                 />
               </div>
-              <button type="submit" className="btn btn-primary">
-                Send Message
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                {loading ? 'Sending...' : 'Send Message'}
               </button>
             </>
           )}

@@ -43,7 +43,7 @@ export default function Navbar() {
             <Link to="/login" className="btn btn-secondary btn-inline" onClick={() => setMenuOpen(false)}>
               Login
             </Link>
-            <Link to="/signup" className="btn btn-primary btn-inline" onClick={() => setMenuOpen(false)}>
+            <Link to="/signup" className="btn btn-secondary btn-inline" onClick={() => setMenuOpen(false)}>
               Sign Up
             </Link>
           </div>

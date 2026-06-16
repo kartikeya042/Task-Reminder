@@ -1,13 +1,17 @@
-const API_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:5000').replace(/\/$/, '');
+const API_BASE = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace(/\/$/, '');
 
 export function apiUrl(path) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
 
+  // Production base may include /api (e.g. https://api.example.com/api)
   if (API_BASE.endsWith('/api')) {
-    const route = normalizedPath.startsWith('/api/') ? normalizedPath.slice(4) : normalizedPath;
+    const route = normalizedPath.startsWith('/api/')
+      ? normalizedPath.slice(4)
+      : normalizedPath;
     return `${API_BASE}${route}`;
   }
 
+  // Local dev base is host only (e.g. http://localhost:5000)
   if (normalizedPath.startsWith('/api/')) {
     return `${API_BASE}${normalizedPath}`;
   }
