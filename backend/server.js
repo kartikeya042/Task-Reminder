@@ -512,19 +512,35 @@ async function sendWhatsAppNotification(mobile, message) {
     return;
   }
 
-  try {
-    const response = await fetch(`${serviceUrl}/send-message`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mobile, message }),
-    });
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY_MS = 10000; // Wait 10 seconds between retries
 
-    if (!response.ok) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(`${serviceUrl}/send-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, message }),
+        signal: AbortSignal.timeout(15000), // 15 second timeout per attempt
+      });
+
+      if (response.ok) {
+        return; // Success, exit
+      }
+
       const data = await response.json().catch(() => ({}));
-      throw new Error(data.message || `HTTP ${response.status}`);
+
+      if (response.status === 503 && attempt < MAX_RETRIES) {
+        console.warn(`[WHATSAPP-SERVICE] 503 on attempt ${attempt}/${MAX_RETRIES} for ${mobile}. Retrying in 10s...`);
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+      } else {
+        throw new Error(data.message || `HTTP ${response.status}`);
+      }
+    } catch (err) {
+      if (attempt === MAX_RETRIES) {
+        console.error(`[WHATSAPP-SERVICE ERROR] Failed after ${MAX_RETRIES} attempts for ${mobile}: ${err.message}`);
+      }
     }
-  } catch (err) {
-    console.error(`[WHATSAPP-SERVICE ERROR] Failed to send message to ${mobile}:`, err.message);
   }
 }
 
@@ -557,9 +573,13 @@ async function processReminderNotifications() {
   // --- ADDED: RENDER HEARTBEAT PING ---
   // This sends an HTTP request to your Render server every time this cron runs
   // to ensure the 15-minute inactivity timer resets.
-  fetch('https://whatsapp-service-b2rl.onrender.com/health').catch((err) => {
-    console.log('[HEARTBEAT] Render wake-up ping failed quietly:', err.message);
-  });
+  const waServiceUrl = process.env.WHATSAPP_SERVICE_URL;
+  if (waServiceUrl) {
+    fetch(`${waServiceUrl}/health`).catch((err) => {
+      console.log('[HEARTBEAT] Render wake-up ping failed quietly:', err.message);
+    });
+  }
+
 
   if (isProcessingReminders) {
     console.log('[CRON TICK] Previous job still running (network delay), skipping this minute.');
