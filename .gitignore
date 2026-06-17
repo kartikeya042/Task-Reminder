@@ -13,3 +13,4 @@ whatsapp-service/auth_info_baileys/
 !.env.example
 
 *.zip
+architecture.md
